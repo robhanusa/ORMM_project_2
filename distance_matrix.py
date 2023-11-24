@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Nov 13 14:20:52 2023
-
-@author: rhanusa
+https://googlemaps.github.io/google-maps-services-python/docs/index.html
 """
 import googlemaps
 import numpy as np
@@ -80,13 +78,36 @@ def convert_to_csv_matrix(locs, dms):
                 dist_matrix[origin][destination] = dist
                 time_matrix[origin][destination] = duration * 2
                 
-    np.savetxt('distance_matrix_bike.csv',dist_matrix, delimiter=',')           
-    np.savetxt('time_matrix_bike.csv',time_matrix, delimiter=',') 
+    np.savetxt('distance_matrix_bike.csv', dist_matrix, delimiter=',')           
+    np.savetxt('time_matrix_bike.csv', time_matrix, delimiter=',') 
 
 
 #%%
 
-mode = 'bicycling'
-dms = create_distance_matricies(LOCS, mode)
-convert_to_csv_matrix(LOCS, dms)
+# mode = 'bicycling'
+# dms = create_distance_matricies(LOCS, mode)
+# convert_to_csv_matrix(LOCS, dms)
+
+#%% Geocoding
+def geocode(locs):
+    coordinates = []
     
+    for loc in locs:
+        coordinates.append(gmaps.geocode(loc))
+        
+    return coordinates
+
+
+def generate_coordinates(coordinates):
+    coords = []
+    
+    for item in coordinates:
+        coord = item[0]['geometry']['location']
+        coords.append((coord['lat'], coord['lng']))
+        
+    np.savetxt('coords.csv', coords, delimiter=',')
+    
+#%%
+
+# coordinates = geocode(LOCS)
+# generate_coordinates(coordinates)

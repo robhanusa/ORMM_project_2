@@ -128,3 +128,18 @@ for i in Nodes:
 
 for k in Satellites:
     obj.addTerms(C[k], a[k])
+    
+model.setObjective(obj, GRB.MINIMIZE)
+
+model.optimize()
+#%%
+
+x_values = np.zeros((len(Nodes), len(Nodes), len(Bikes)))
+
+# Fill in the values from the flattened array
+for i in Nodes:
+    for j in Nodes:
+        for b in Bikes:
+            if i != j:
+                x_values[i, j, b] = x[i, j, b].X
+                
