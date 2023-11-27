@@ -12,14 +12,14 @@ import matplotlib.pyplot as plt
 
 # coordinates = np.genfromtxt('coords.csv', delimiter=',')          
 
-x_values = np.load('x_values2.npy')
+# x_values = np.load('x_values3.npy')
 
-bike1 = x_values[:,:,0]
-bike2 = x_values[:,:,1]
-bike3 = x_values[:,:,2]
-bike4 = x_values[:,:,3]
-bike5 = x_values[:,:,4]
-bike6 = x_values[:,:,5]
+# bike1 = x_values[:,:,0]
+# bike2 = x_values[:,:,1]
+# bike3 = x_values[:,:,2]
+# bike4 = x_values[:,:,3]
+# bike5 = x_values[:,:,4]
+# bike6 = x_values[:,:,5]
 
 def make_node_routes(x_values):
     node_routes = []
@@ -47,7 +47,7 @@ def make_node_routes(x_values):
         
     return node_routes
 
-node_routes = make_node_routes(x_values)
+# node_routes = make_node_routes(x_values)
 
 
 
@@ -92,4 +92,3 @@ def plot_routes(x_values):
     
     
     plt.title('Pharmacies')
-    #plt.show()

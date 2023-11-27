@@ -39,91 +39,76 @@ C = (60, 120, 130, 50)
 
 
 # ---- Sets ---- 
+num_nodes = 16
+num_bikes = 6
+num_satellites = 4
 Nodes = range(16)  # Set of customers
 Satellites = range(4)  # Set of possible satellites
 Satellites_ind = (1, 3, 7, 12)  # Set of possible satellites, adjusted for index
 Not_satellites = [i for i in Nodes if i not in Satellites_ind]
-Bikes = range(6)
+Bikes = range(num_bikes)
 
 model = gp.Model("Design") # Make Gurobi model
 
-# ---- Variables ----
-x = {}  # Travel from node i to j for bike b
-a = {}  # Whether node k is chosen as a satellie
-w = {}  # Whether bike b leaves from satellite k
-
-
 # ---- Initialize variables
 
-# x[i,j,b]
-for i in Nodes:
-    for j in Nodes:
-        for b in Bikes:
-            if i != j:
-                x[i,j,b] = model.addVar(vtype=GRB.BINARY, 
-                                        name=f'x[{i},{j},{b}]')
-                
-# a[k]
-for k in Satellites:
-    a[k] = model.addVar(vtype=GRB.BINARY, name=f'a[{k}]')
+# Travel from node i to j for bike b
+x = model.addVars(num_nodes, num_nodes, num_bikes, vtype=GRB.BINARY, name='x')            
+
+# # Whether node k is chosen as a satellie       
+# a = model.addVars(num_satellites, vtype=GRB.BINARY, name='a')
     
-    
-# w[b,k]
-for b in Bikes:
-    for k in Satellites:
-        w[b,k] = model.addVar(vtype=GRB.BINARY, name=f'w[{b},{k}]')
-        
+# # Whether bike b leaves from satellite k
+# w = model.addVars(num_bikes, num_satellites, vtype=GRB.BINARY, name='w')
+
 
 # ---- Add constraints
 
-# Maximum of 3 satellites
-model.addConstr(gp.quicksum(a[k] for k in Satellites) <=3)
+# # Maximum of 3 satellites
+# model.addConstr(gp.quicksum(a[k] for k in Satellites) <=3)
 
-# Bike cannot be assigned to a satellite if the satellite is not chosen
-for k in Satellites:
-    model.addConstr(gp.quicksum(w[b,k] for b in Bikes) <= M*a[k])
+# # Bike cannot be assigned to a satellite if the satellite is not chosen
+# model.addConstrs(gp.quicksum(w[b,k] for b in Bikes) 
+#                 <= M*a[k] for k in Satellites)
+    
 
 # Bike exits all nodes that it enters
-for i in Nodes:
-    for b in Bikes:
-        model.addConstr(gp.quicksum(x[i,j,b] for j in Nodes if i != j)
-                        == gp.quicksum(x[j,i,b] for j in Nodes if i != j))
-        
-# # Every node is entered at least once
-# for j in Nodes:
-#     model.addConstr(gp.quicksum(x[i,j,b] for i in Nodes for b in Bikes if i != j)
-#                     >= 1)
+model.addConstrs(gp.quicksum(x[i,j,b] for j in Nodes if i != j)
+                == gp.quicksum(x[j,i,b] for j in Nodes if i != j)
+                for i in Nodes
+                for b in Bikes)
 
-# Every non-satellite node is entered once
-for j in Not_satellites:
-    model.addConstr(gp.quicksum(x[i,j,b] for i in Nodes for b in Bikes 
-                                if (i != j and i not in Satellites_ind))
-                    == 1)
-    
+# Every non-satellite node is entered exactly once
+model.addConstrs(gp.quicksum(x[i,j,b] for i in Nodes for b in Bikes 
+                            if (i != j and i not in Satellites_ind))
+                == 1 for j in Not_satellites)
+
 # # Every non-satellite node is exited once-----------
 # for i in Not_satellites:
 #     model.addConstr(gp.quicksum(x[i,j,b] for j in Nodes for b in Bikes 
 #                                 if (i != j and j not in Satellites_ind))
 #                     == 1)
         
+
 # Every bike leaves a satellite. If a satellite isn't chosen, bike may leave 
-# more than 1 satellite
-for b in Bikes:
-    model.addConstr(gp.quicksum(x[k,j,b] for k in Satellites_ind for j in Nodes
-                                if k != j) >= 1)
+# more than 1 satellite    
+model.addConstrs(gp.quicksum(x[k,j,b] for k in Satellites_ind for j in Nodes
+                            if k != j) 
+                >= 1 for b in Bikes)
+    
     
 # Bike capacity limit
 # TODO: need to exclude demand at the satellites
-for b in Bikes:
-    model.addConstr(gp.quicksum(D[j]*x[i,j,b] for i in Nodes for j in Nodes 
-                                if i != j) <= QB)
+model.addConstrs(gp.quicksum(D[j]*x[i,j,b] for i in Nodes for j in Nodes 
+                            if i != j)
+                 <= QB for b in Bikes)    
+
     
-# Total demand on bike route must be <= current inventory at satellite 
-# For now we assume M inventory
-for b in Bikes:
-    model.addConstr(gp.quicksum(D[j]*x[i,j,b] for i in Nodes for j in Nodes 
-                                if i != j) 
-                    <= gp.quicksum(M*w[b,k] for k in Satellites))
+# # Total demand on bike route must be <= current inventory at satellite 
+# # For now we assume M inventory
+# model.addConstrs(gp.quicksum(D[j]*x[i,j,b] for i in Nodes for j in Nodes 
+#                                 if i != j)
+#                  <= gp.quicksum(M*w[b,k] for k in Satellites) for b in Bikes)
     
 
 # Subtour elimination constraints
@@ -131,9 +116,10 @@ num_customers = 16
 num_vehicles = 6
 u = model.addVars(num_customers, vtype=GRB.CONTINUOUS, lb=1, ub=num_customers-1, name="u")
 #model.addConstrs(u[i] - u[j] + num_customers * x[i, j, k] <= num_customers - 1 for i in range(num_customers) for j in range(1, num_customers) for k in range(num_vehicles) if i != j)
-model.addConstrs(u[i] - u[j] + num_customers * x[i, j, k] <= num_customers - 2 for i in range(1, num_customers) for j in range(1, num_customers) for k in range(num_vehicles) if i != j)
-# model.addConstrs(u[i] - u[j] + num_customers * x[i, j, k] <= num_customers - 2 for i in range(1, num_customers) for j in range(1, num_customers) for k in range(num_vehicles) if i != j)
-# model.addConstrs((gp.quicksum(x[i, j, k] for j in range(num_customers) if i != j) == 2) for k in range(num_vehicles) for i in Satellites_ind)
+model.addConstrs(u[i] - u[j] + num_customers * x[i, j, k] <= num_customers - 2 
+                 for i in range(1, num_customers) 
+                 for j in range(1, num_customers) 
+                 for k in range(num_bikes) if i != j)
 
 # ---- Set objective
 
@@ -150,8 +136,8 @@ for i in Nodes:
             for b in Bikes:
                 obj.addTerms(P[i,j], x[i,j,b])
 
-for k in Satellites:
-    obj.addTerms(C[k], a[k])
+# for k in Satellites:
+#     obj.addTerms(C[k], a[k])
     
 model.setObjective(obj, GRB.MINIMIZE)
 
@@ -171,4 +157,4 @@ for i in Nodes:
                 
 pl.plot_routes(x_values)
 
-np.save('x_values2.npy', x_values)
+np.save('x_values3.npy', x_values)
