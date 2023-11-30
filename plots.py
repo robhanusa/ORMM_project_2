@@ -8,30 +8,54 @@ Created on Thu Nov 23 13:29:03 2023
 import numpy as np
 import matplotlib.pyplot as plt
 
-#from network_model import x_values
+# from network_model import x_values
 
 # coordinates = np.genfromtxt('coords.csv', delimiter=',')          
 
-# x_values = np.load('x_values3.npy')
+x_values = np.load('x_values3.npy')
 
-# bike1 = x_values[:,:,0]
-# bike2 = x_values[:,:,1]
-# bike3 = x_values[:,:,2]
-# bike4 = x_values[:,:,3]
-# bike5 = x_values[:,:,4]
-# bike6 = x_values[:,:,5]
+bike1 = x_values[:,:,0]
+bike2 = x_values[:,:,1]
+bike3 = x_values[:,:,2]
+bike4 = x_values[:,:,3]
+bike5 = x_values[:,:,4]
+
+
+# Create node map to allow us to put satellites at beginning or end
+node_map = {
+    0: 7,
+    1: 0,
+    2: 1,
+    3: 2,
+    4: 3,
+    5: 4,
+    6: 5,
+    7: 6,
+    8: 8,
+    9: 9,
+    10: 10,
+    11: 11,
+    12: 13,
+    13: 14,
+    14: 15,
+    15: 12
+    }
 
 def make_node_routes(x_values):
     node_routes = []
     
     for bike in range(len(x_values[0,0,:])):
+        node_list_map = []
         node_list = []
         i = 0
         flag = True
         while i < len(x_values[:,0,0]) and i not in node_list:
+            i_map = node_map[i]
             for j in range(len(x_values[0,:,0])):
+                j_map = node_map[j]
                 if x_values[i,j,bike] == 1:
                     flag = False
+                    node_list_map.append(i_map)
                     node_list.append(i)
                     i=j
                     break
@@ -43,11 +67,11 @@ def make_node_routes(x_values):
                 i += 1
                 flag = False
         
-        node_routes.append(node_list)
+        node_routes.append(node_list_map)
         
     return node_routes
 
-# node_routes = make_node_routes(x_values)
+node_routes = make_node_routes(x_values)
 
 
 
