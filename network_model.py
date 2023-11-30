@@ -45,7 +45,7 @@ D = create_ave_demand_arr(Satellites_ind)  # Demand at j
 P = np.genfromtxt('time_matrix_bike.csv', delimiter=',')  
 
 # ---- Sets ---- 
-num_nodes = 16
+num_nodes = 16-1
 num_bikes = 5
 Nodes = range(num_nodes)  # Set of non-satellites nodes, except bike depot
 Bikes = range(num_bikes)
@@ -65,7 +65,10 @@ model.addConstrs(gp.quicksum(x[i,j,b] for j in Nodes if i != j)
                 for i in Nodes
                 for b in Bikes)
 
-# Every non-satellite node is entered exactly once
+# Every non-satellite node is entered at least once.
+# Note that entering each non-satellite exactly once makes the computation
+# More complex (and longer). With the >= constraint we expect the optimal 
+# Solution to normally only enter and exit these nodes once anyway
 model.addConstrs(gp.quicksum(x[i,j,b] for i in Nodes for b in Bikes 
                             if (i != j))
                 >= 1 for j in Nodes)        
@@ -73,7 +76,11 @@ model.addConstrs(gp.quicksum(x[i,j,b] for i in Nodes for b in Bikes
 # Every bike leaves depot  
 model.addConstrs(gp.quicksum(x[0,j,b] for j in Nodes if j > 0) 
                 >= 1 for b in Bikes)
-    
+
+# Every bike enters depot. This ensures circular route
+model.addConstrs(gp.quicksum(x[i,0,b] for i in Nodes if i > 0) 
+                >= 1 for b in Bikes) 
+
     
 # Bike capacity limit
 model.addConstrs(gp.quicksum(D[node_map[j]]*x[i,j,b] 

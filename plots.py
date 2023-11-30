@@ -111,7 +111,7 @@ def plot_routes(x_values):
     # Plot the coordinates
     ax.scatter(coordinates[:, 1], coordinates[:, 0])
     for i, coord in enumerate(coordinates):
-        ax.annotate(str(i), (coord[1], coord[0]), xytext = (5,0), 
+        ax.annotate(str(i+1), (coord[1], coord[0]), xytext = (5,0), 
                     textcoords='offset pixels')
     
     
