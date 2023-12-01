@@ -9,19 +9,21 @@ import numpy as np
 import gurobipy as gp
 from gurobipy import GRB
 
-import plots as pl
-from plots import node_map
+# import plots as pl
+from plots import nmap
 
 # ---- Global variables ----
-M = 1000
-
-# Bike capacity
-QB = 80
+n = 14  # Number of customers
+n_bar = 22  # Total nodes
+m = 1  # Number of bikes available
+Q = 80  # Bike capacity
+Q_hat = 40  # Max inventory on bike before refill permitted
+T = 120  # Max time per route
 
 # Satellite indicies, determined from satellite_selection.py
-Satellites_ind = (7, 12)
+Satellites = (7, 12)
 
-def create_ave_demand_arr(Satellites_ind):
+def create_ave_demand_arr(Satellites):
     """Creates 1D numpy array with average demand per customer"""
     
     demand = np.genfromtxt('demand.csv', delimiter=',')[1:17,1:]
@@ -33,87 +35,111 @@ def create_ave_demand_arr(Satellites_ind):
     # Set satellite demands to 0
     demands_ave = []
     for i in range(len(d_with_sats)):
-        if i not in Satellites_ind:
+        if i not in Satellites:
             demands_ave.append(d_with_sats[i])
         else:
             demands_ave.append(0)
     return demands_ave
 
-D = create_ave_demand_arr(Satellites_ind)  # Demand at j
+# Arrays below must be referenced using nmap
+q = create_ave_demand_arr(Satellites)  # Demand at nmap[j]
+p = [10 if i in Satellites else 5 for i in range(len(q))] # Load/refil time
+
+q_bar = [-Q if i in Satellites else q[i] for i in range(len(q))]
+Q_bar = [Q if i in Satellites else Q - q[i]for i in range(len(q))]
+
 
 # Time from i to j by bike
-P = np.genfromtxt('time_matrix_bike.csv', delimiter=',')  
+tau = np.genfromtxt('time_matrix_bike.csv', delimiter=',')  
+
+T_array = []
+
+for i in range(len(tau)-1): # Subtract 1 since last row of tau is (real) depot
+    T_list = []
+    for j in range(len(tau)-1):
+        if i in Satellites:
+            temp_list = [p[i] + tau[i,k] + p[k] + tau[k,0] for k in range(len(p))]
+            T_list.append(T-tau[0,j] - min(temp_list))
+        else:
+            T_list.append(T - tau[0,j] - (p[i] + tau[i,0]))
+            
+    T_array.append(T_list)
+    
+# TODO: Check, should this really be the lower bound for t?
+t_lb = max([2*tau[0,i] + p[i] for i in range(len(p)) if i not in Satellites])  
+
+tj_min = [min([tau[0,i] + p[i] + tau[i,j] for i in range(len(p))]) for j in range(len(p))]
+
+tj_max = [max([T - p[j] - tau[j,i] - p[i] - tau[i,0] for i in range(len(p))]) for j in range(len(p))]
+
+# Below here we use node indexes, no nmap is needed when referring to
+# x, t, y
 
 # ---- Sets ---- 
-num_nodes = 16-1
-num_bikes = 5
-Nodes = range(num_nodes)  # Set of non-satellites nodes, except bike depot
-Bikes = range(num_bikes)
+
+N_a = range(15,22)  # Nodes where bikes can reload (depot/satellite)
+N = range(22)  # All nodes
+I = range(1,15)  # All customer nodes, where a delivery must occur
+I0 = range(15)  # Customer nodes plus depot
+I_F = range(1,22)
 
 model = gp.Model("Design") # Make Gurobi model
 
 # ---- Initialize variables
 
 # Travel from node i to j for bike b
-x = model.addVars(num_nodes, num_nodes, num_bikes, vtype=GRB.BINARY, name='x')            
+# x = model.addVars(num_nodes, num_nodes, num_bikes, vtype=GRB.BINARY, name='x')            
+x = model.addVars(n_bar, n_bar, vtype=GRB.BINARY, name='x') 
+
+t = model.addVars(n_bar, vtype=GRB.CONTINUOUS, lb=t_lb, ub=T, name='t')
+
+y = model.addVars(n_bar, vtype=GRB.CONTINUOUS, lb=0, ub=Q, name = 'y')
 
 # ---- Add constraints
 
-# Bike exits all nodes that it enters
-model.addConstrs(gp.quicksum(x[i,j,b] for j in Nodes if i != j)
-                == gp.quicksum(x[j,i,b] for j in Nodes if i != j)
-                for i in Nodes
-                for b in Bikes)
+model.addConstrs(gp.quicksum(x[i,j] for j in N if i !=j) == 1 for i in I)
 
-# Every non-satellite node is entered at least once.
-# Note that entering each non-satellite exactly once makes the computation
-# More complex (and longer). With the >= constraint we expect the optimal 
-# Solution to normally only enter and exit these nodes once anyway
-model.addConstrs(gp.quicksum(x[i,j,b] for i in Nodes for b in Bikes 
-                            if (i != j))
-                >= 1 for j in Nodes)        
+model.addConstrs(gp.quicksum(x[i,j] for j in I if i !=j) <= 1 for i in N_a)
 
-# Every bike leaves depot  
-model.addConstrs(gp.quicksum(x[0,j,b] for j in Nodes if j > 0) 
-                >= 1 for b in Bikes)
+# TODO: try restricting j to 1:21?
+model.addConstrs(gp.quicksum(x[j,i] for i in N if i != j) 
+                 - gp.quicksum(x[i,j] for i in N if i != j)
+                 == 0 for j in N)
 
-# Every bike enters depot. This ensures circular route
-model.addConstrs(gp.quicksum(x[i,0,b] for i in Nodes if i > 0) 
-                >= 1 for b in Bikes) 
+model.addConstr(gp.quicksum(x[0,j] for j in I) <= m)
 
-    
-# Bike capacity limit
-model.addConstrs(gp.quicksum(D[node_map[j]]*x[i,j,b] 
-                             for i in Nodes 
-                             for j in Nodes 
-                             if i != j)
-                 <= QB for b in Bikes)    
+model.addConstrs(t[j] >= t[i] + tau[nmap[i],nmap[j]]*x[i,j] 
+                 - T_array[nmap[i]][nmap[j]] * (1-x[i,j]) 
+                 for i in I_F for j in N if i != j)
 
+model.addConstrs(t[j] >= tau[nmap[0], nmap[j]] for j in I)
 
-# Subtour elimination constraints
-u = model.addVars(num_nodes, vtype=GRB.CONTINUOUS, lb=1, ub=num_nodes-1, 
-                  name="u")
-model.addConstrs(u[i] - u[j] + num_nodes * x[i, j, k] <= num_nodes - 2 
-                  for i in range(1, num_nodes) 
-                  for j in range(1, num_nodes) 
-                  for k in range(num_bikes) if i != j)
+model.addConstrs(t[j] <= T - (p[nmap[j]] + tau[nmap[j], nmap[0]]) for j in I)
+
+# 9.1
+model.addConstrs(t[j] >= tj_min[nmap[j]] for j in N_a)
+
+model.addConstrs(t[j] <= tj_max[nmap[j]] for j in N_a)
+
+#10
+model.addConstrs(y[j] <= y[i] - q_bar[nmap[i]]*x[i,j] + Q_bar[nmap[i]]*(1-x[i,j])
+                 for i in I_F for j in N if i != j)
+
+model.addConstrs(y[j] >= q[nmap[j]] for j in I)
+
+model.addConstrs(y[j] <= Q_hat for j in N_a)
+
 
 # ---- Set objective
 
 obj = gp.LinExpr()
 
-# Obj function will minimize cost, but without taking into account time or 
-# deliveries from the Depot yet, cost is minimal so we want to minimize
-# time on bikes. So, we assign a cost to each minute ridden of €150/120
 
-# Add cost for distance
-for i in Nodes:
-    i_map = node_map[i]
-    for j in Nodes:
-        j_map = node_map[j]
+for i in N:
+    for j in N:
         if i != j:
-            for b in Bikes:
-                obj.addTerms(P[i_map, j_map], x[i, j, b])
+            obj.addTerms(tau[nmap[i], nmap[j]], x[i, j])
+
     
 model.setObjective(obj, GRB.MINIMIZE)
 
@@ -122,15 +148,14 @@ model.optimize()
 
 import plots as pl
 
-x_values = np.zeros((len(Nodes), len(Nodes), len(Bikes)))
+x_values = np.zeros((len(N), len(N)))
 
 # Fill in the values from the flattened array
-for i in Nodes:
-    for j in Nodes:
-        for b in Bikes:
-            if i != j:
-                x_values[i, j, b] = x[i, j, b].X
+for i in N:
+    for j in N:
+        if i != j:
+            x_values[i, j] = x[i, j].X
                 
 pl.plot_routes(x_values)
 
-np.save('x_values3.npy', x_values)
+np.save('x_values4.npy', x_values)

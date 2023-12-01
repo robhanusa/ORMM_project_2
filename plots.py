@@ -12,17 +12,17 @@ import matplotlib.pyplot as plt
 
 # coordinates = np.genfromtxt('coords.csv', delimiter=',')          
 
-x_values = np.load('x_values3.npy')
+x_values = np.load('x_values4.npy')
 
-bike1 = x_values[:,:,0]
-bike2 = x_values[:,:,1]
-bike3 = x_values[:,:,2]
-bike4 = x_values[:,:,3]
-bike5 = x_values[:,:,4]
+# bike1 = x_values[:,:,0]
+# bike2 = x_values[:,:,1]
+# bike3 = x_values[:,:,2]
+# bike4 = x_values[:,:,3]
+# bike5 = x_values[:,:,4]
 
 
 # Create node map to allow us to put satellites at beginning or end
-node_map = {
+nmap = {
     0: 7,
     1: 0,
     2: 1,
@@ -38,40 +38,47 @@ node_map = {
     12: 13,
     13: 14,
     14: 15,
-    15: 12
+    15: 12,
+    16: 7,
+    17: 7,
+    18: 7,
+    19: 12,
+    20: 12,
+    21: 12
     }
+
 
 def make_node_routes(x_values):
     node_routes = []
-    
-    for bike in range(len(x_values[0,0,:])):
-        node_list_map = []
-        node_list = []
-        i = 0
-        flag = True
-        while i < len(x_values[:,0,0]) and i not in node_list:
-            i_map = node_map[i]
-            for j in range(len(x_values[0,:,0])):
-                j_map = node_map[j]
-                if x_values[i,j,bike] == 1:
+    i = 0
+    flag = True
+    for i in range(len(x_values[:,0])):
+        if x_values[i,0] == 1:
+            node_list = [0, i]
+            node_list_map = [nmap[0], nmap[i]]
+            i_route = i
+            c = 0
+            while i_route < len(x_values[:,0])and 0 not in node_list[1:]: 
+                for j in range(len(x_values[0,:])):
+                    if x_values[j, i_route] == 1:
+                        flag = False
+                        node_list_map.append(nmap[j])
+                        node_list.append(j)
+                        i_route = j
+                        break
+                    else:
+                        flag = True
+                        pass
+                c += 1
+                if flag:
+                    i_route += 1
                     flag = False
-                    node_list_map.append(i_map)
-                    node_list.append(i)
-                    i=j
-                    break
-                else:
-                    flag = True
-                    pass
-                
-            if flag:
-                i += 1
-                flag = False
-        
-        node_routes.append(node_list_map)
+            
+            node_routes.append(node_list_map)
         
     return node_routes
 
-node_routes = make_node_routes(x_values)
+# node_routes = make_node_routes(x_values)
 
 
 
