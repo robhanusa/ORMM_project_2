@@ -113,12 +113,16 @@ def plot_routes(x_values):
     for route in routes:
         x = [route[i][1] for i in range(len(route))]
         y = [route[i][0] for i in range(len(route))]
-        plt.plot(x,y)
+        plt.plot(x,y, color='b')
     
     # Plot the coordinates
     ax.scatter(coordinates[:, 1], coordinates[:, 0])
     for i, coord in enumerate(coordinates):
-        ax.annotate(str(i+1), (coord[1], coord[0]), xytext = (5,0), 
+        
+        # Uncomment below to label points according to prompt
+        # ax.annotate(str(i+1), (coord[1], coord[0]), xytext = (5,0), 
+        #             textcoords='offset pixels')
+        ax.annotate(str(i), (coord[1], coord[0]), xytext = (5,0), 
                     textcoords='offset pixels')
     
     
