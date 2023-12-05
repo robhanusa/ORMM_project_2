@@ -16,7 +16,7 @@ from plots import nmap
 # ---- Global variables ----
 n = 14  # Number of customers
 n_bar = 22  # Total nodes
-m = 3  # Number of bikes available
+m = 2  # Number of bikes available
 Q = 80  # Bike capacity
 Q_hat = 40  # Max inventory on bike before refill permitted
 T = 120  # Max time per route
@@ -45,7 +45,7 @@ def create_ave_demand_arr(Satellites):
 
 # Arrays below must be referenced using nmap
 q = create_ave_demand_arr(Satellites)  # Demand at nmap[j]
-p = [10 if i in Satellites else 5 for i in range(len(q))] # Load/refil time
+p = [10 if i in Satellites else 5 for i in range(len(q))] # Load/refill time
 
 q_bar = [-Q if i in Satellites else q[i] for i in range(len(q))]
 Q_bar = [Q if i in Satellites else Q - q[i]for i in range(len(q))]
@@ -79,13 +79,15 @@ tj_max = [max([T - p[j] - tau[j,i] - p[i] - tau[i,depot] for i in range(len(p))]
 
 # ---- Sets ---- 
 
-N_a = range(15,22)  # Nodes where bikes can reload (depot/satellite)
+S = (0,15)  # Nodes corresponding to a satellite
+N_a = range(16,22)  # Nodes where bikes can reload (copies of satellites)
 N = range(22)  # All nodes
 I = range(1,15)  # All customer nodes, where a delivery must occur
-I0 = range(15)  # Customer nodes plus depot
-I_F = range(1,22)
+I0 = range(16)  # Customer nodes plus satellites
+I_F = [i for i in range(1,22) if i !=15]  # Nodes not including satellites
 
 model = gp.Model("Design") # Make Gurobi model
+
 
 # ---- Initialize variables
 
@@ -95,6 +97,7 @@ x = model.addVars(n_bar, n_bar, vtype=GRB.BINARY, name='x')
 t = model.addVars(n_bar, vtype=GRB.CONTINUOUS, lb=0, ub=T, name='t')
 
 y = model.addVars(n_bar, vtype=GRB.CONTINUOUS, lb=0, ub=Q, name = 'y')
+
 
 # ---- Add constraints
 
@@ -109,11 +112,12 @@ model.addConstrs(gp.quicksum(x[j,i] for i in N if i != j)
                  - gp.quicksum(x[i,j] for i in N if i != j)
                  == 0 for j in N)
 
-# No more than m vehicles used (i.e. only m vehicles can start journey at depot)
-model.addConstr(gp.quicksum(x[0,j] for j in I) <= m)
+# No more than m vehicles used (i.e. only m vehicles can start journey at a depot)
+model.addConstr(gp.quicksum(x[0,j]+x[15,j] for j in I) <= m)
+
 
 # Tracks the time a service begins at node j. Also functions to eliminate subtours
-model.addConstrs(t[j] >= t[i] + tau[nmap[i],nmap[j]]*x[i,j] # + p[nmap[j]] 
+model.addConstrs(t[j] >= t[i] + tau[nmap[i],nmap[j]]*x[i,j] + p[nmap[j]] 
                  - T_array[nmap[i]][nmap[j]] * (1-x[i,j]) 
                  for i in I_F for j in N if i != j)
 
@@ -123,9 +127,7 @@ model.addConstr(t[0] >= t_lb)
 
 # Lower bound for t at customer nodes. There must be enough time to get to the
 # customer from the depot.
-# TODO: Add p[j] to account for the fact the bike must load first at the depot
-# before departing?
-model.addConstrs(t[j] >= tau[nmap[0], nmap[j]] + p[nmap[j]] for j in I)
+model.addConstrs(t[j] >= tau[nmap[0], nmap[j]] for j in I)
 
 # Upper bound for t at customer nodes. There must be enough time left for the
 # bike to get back to the depot
@@ -181,6 +183,6 @@ for i in N:
             x_values[i, j] = x[i, j].X
             
                 
-pl.plot_routes(x_values)
+pl.plot_routes(x_values, S)
 
 np.save('x_values4.npy', x_values)

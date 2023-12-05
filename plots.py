@@ -12,14 +12,7 @@ import matplotlib.pyplot as plt
 
 # coordinates = np.genfromtxt('coords.csv', delimiter=',')          
 
-x_values = np.load('x_values4.npy')
-
-# bike1 = x_values[:,:,0]
-# bike2 = x_values[:,:,1]
-# bike3 = x_values[:,:,2]
-# bike4 = x_values[:,:,3]
-# bike5 = x_values[:,:,4]
-
+# x_values = np.load('x_values4.npy')
 
 # Create node map to allow us to put satellites at beginning or end
 nmap = {
@@ -46,19 +39,18 @@ nmap = {
     20: 12,
     21: 12
     }
-
-
-def make_node_routes(x_values):
+    
+def make_routes_per_sat(x_values, sat):    
     node_routes = []
     i = 0
     flag = True
     for i in range(len(x_values[:,0])):
-        if x_values[i,0] == 1:
-            node_list = [0, i]
-            node_list_map = [nmap[0], nmap[i]]
+        if x_values[i,sat] == 1:
+            node_list = [sat, i]
+            node_list_map = [nmap[sat], nmap[i]]
             i_route = i
             c = 0
-            while i_route < len(x_values[:,0])and 0 not in node_list[1:]: 
+            while i_route < len(x_values[:,0]) and sat not in node_list[1:]: 
                 for j in range(len(x_values[0,:])):
                     if x_values[j, i_route] == 1:
                         flag = False
@@ -78,8 +70,18 @@ def make_node_routes(x_values):
         
     return node_routes
 
-# node_routes = make_node_routes(x_values)
 
+def make_node_routes(x_values, satellites):
+    node_routes = []
+    for sat in satellites:
+        routes = make_routes_per_sat(x_values, sat)
+        for route in routes:
+            node_routes.append(route)
+        
+    return node_routes
+    
+
+# node_routes = make_node_routes(x_values, (0,15))
 
 
 def make_coordinate_routes(node_routes, coordinates):
@@ -100,11 +102,11 @@ def make_coordinate_routes(node_routes, coordinates):
 
 #%%
 
-def plot_routes(x_values):
+def plot_routes(x_values, satellites):
     
     coordinates = np.genfromtxt('coords.csv', delimiter=',')
     
-    node_routes = make_node_routes(x_values)
+    node_routes = make_node_routes(x_values, satellites)
     
     routes = make_coordinate_routes(node_routes, coordinates)
     
@@ -113,7 +115,7 @@ def plot_routes(x_values):
     for route in routes:
         x = [route[i][1] for i in range(len(route))]
         y = [route[i][0] for i in range(len(route))]
-        plt.plot(x,y, color='b')
+        plt.plot(x,y) #, color='b')
     
     # Plot the coordinates
     ax.scatter(coordinates[:, 1], coordinates[:, 0])
