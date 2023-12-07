@@ -66,6 +66,7 @@ def make_routes_per_sat(x_values, sat, satellites):
                     i_route += 1
                     flag = False
             
+            #
             node_routes.append(node_list_map)
         
     return node_routes
@@ -81,7 +82,7 @@ def make_node_routes(x_values, satellites):
     return node_routes
     
 
-node_routes = make_node_routes(x_values, (0,15))
+customer_routes = make_node_routes(x_values, (0,15))
 
 
 def make_coordinate_routes(node_routes, coordinates):
@@ -126,3 +127,28 @@ def plot_routes(x_values, satellites):
     
     
     plt.title('Pharmacies')
+
+
+#%%
+
+# import pandas as pd
+
+# t_values = np.load('t_values.npy')
+
+# bike_time_order = [index for index, value in sorted(enumerate(t_values), key=lambda x: x[1])]
+# bike_times = [t_values[i] for i in bike_time_order]
+# mapped_order = [nmap[i] for i in bike_time_order]
+
+# df = pd.DataFrame({'customer': mapped_order,'time': bike_times, 'node': bike_time_order})
+
+#%% How long does each bike route take?
+
+tau = np.genfromtxt('time_matrix_bike.csv', delimiter=',')  
+
+times = []
+for route in customer_routes:
+    time = 0
+    for stop in range(len(route)-1):
+        time += tau[route[stop], route[stop+1]]
+    times.append(time)
+    

@@ -16,7 +16,7 @@ from plots import nmap
 # ---- Global variables ----
 n = 14  # Number of customers
 n_bar = 22  # Total nodes
-m = 2  # Number of bikes available
+m = 10  # Number of bikes available
 Q = 80  # Bike capacity
 Q_hat = 40  # Max inventory on bike before refill permitted
 T = 120  # Max time per route
@@ -114,7 +114,7 @@ model.addConstrs(gp.quicksum(x[j,i] for i in N if i != j)
 
 # No more than m vehicles used (i.e. only m vehicles can start journey at a depot)
 model.addConstr(gp.quicksum(x[0,j]+x[15,j] for j in I) <= m)
-
+# model.addConstr(gp.quicksum(x[j,0]+x[j,15] for j in I) <= m)
 
 # Tracks the time a service begins at node j. Also functions to eliminate subtours
 model.addConstrs(t[j] >= t[i] + tau[nmap[i],nmap[j]]*x[i,j] + p[nmap[j]] 
@@ -123,15 +123,15 @@ model.addConstrs(t[j] >= t[i] + tau[nmap[i],nmap[j]]*x[i,j] + p[nmap[j]]
 
 # Lower bound for arrival back at depot. Must be at least as long as visiting
 # the farthest customer, dropping off the load, and returning to depot
-model.addConstr(t[0] >= t_lb)
+model.addConstrs(t[s] >= t_lb for s in S)
 
 # Lower bound for t at customer nodes. There must be enough time to get to the
 # customer from the depot.
-model.addConstrs(t[j] >= tau[nmap[0], nmap[j]] for j in I)
+model.addConstrs(t[j] >= min(tau[Satellites[0], nmap[j]], tau[Satellites[1], nmap[j]]) for j in I)
 
 # Upper bound for t at customer nodes. There must be enough time left for the
 # bike to get back to the depot
-model.addConstrs(t[j] <= T - (p[nmap[j]] + tau[nmap[j], nmap[0]]) for j in I)
+model.addConstrs(t[j] <= T - (p[nmap[j]] + min(tau[nmap[j], Satellites[0]], tau[nmap[j], Satellites[1]])) for j in I)
 
 # Minimum amount of time to go from depot to customer, provide service, and go
 # to a satellite.
@@ -186,3 +186,4 @@ for i in N:
 pl.plot_routes(x_values, S)
 
 np.save('x_values4.npy', x_values)
+np.save('t_values.npy', t_values)
