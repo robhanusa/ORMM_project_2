@@ -23,7 +23,7 @@ T = 120  # Max time per route
 
 # Satellite indicies, determined from satellite_selection.py
 Satellites = (7, 12)
-depot = 7
+
 
 def create_ave_demand_arr(Satellites):
     """Creates 1D numpy array with average demand per customer"""
@@ -60,19 +60,19 @@ for i in range(len(tau)-1): # Subtract 1 since last row of tau is (real) depot
     T_list = []
     for j in range(len(tau)-1):
         if i in Satellites:
-            temp_list = [p[i] + tau[i,k] + p[k] + tau[k,depot] for k in range(len(p))]
-            T_list.append(T-tau[depot,j] - min(temp_list))
+            temp_list = [p[i] + tau[i,k] + p[k] + min(tau[k, Satellites[0]], tau[k, Satellites[1]]) for k in range(len(p))]
+            T_list.append(T-min(tau[Satellites[0],j], tau[Satellites[1],j]) - min(temp_list))
         else:
-            T_list.append(T - tau[depot,j] - (p[i] + tau[i,depot]))
+            T_list.append(T - min(tau[Satellites[0],j], tau[Satellites[1],j]) - (p[i] + min(tau[i, Satellites[0]], tau[i, Satellites[1]])))
             
     T_array.append(T_list)
     
 # Lower bound for t[0]
-t_lb = max([2*tau[depot,i] + p[i] for i in range(len(p)) if i not in Satellites])  
+t_lb = max([2*min(tau[Satellites[0],i], tau[Satellites[1],i]) + p[i] for i in range(len(p)) if i not in Satellites])  
 
-tj_min = [min([tau[depot,i] + p[i] + tau[i,j] for i in range(len(p))]) for j in range(len(p))]
+tj_min = [min([min(tau[Satellites[0],i], tau[Satellites[1],i]) + p[i] + tau[i,j] for i in range(len(p))]) for j in range(len(p))]
 
-tj_max = [max([T - p[j] - tau[j,i] - p[i] - tau[i,depot] for i in range(len(p))]) for j in range(len(p))]
+tj_max = [max([T - p[j] - tau[j,i] - p[i] - min(tau[i, Satellites[0]], tau[i, Satellites[1]]) for i in range(len(p))]) for j in range(len(p))]
 
 # Below here we use node indexes, no nmap is needed when referring to
 # x, t, y

@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 # coordinates = np.genfromtxt('coords.csv', delimiter=',')          
 
-# x_values = np.load('x_values4.npy')
+x_values = np.load('x_values4.npy')
 
 # Create node map to allow us to put satellites at beginning or end
 nmap = {
@@ -40,7 +40,7 @@ nmap = {
     21: 12
     }
     
-def make_routes_per_sat(x_values, sat):    
+def make_routes_per_sat(x_values, sat, satellites):    
     node_routes = []
     i = 0
     flag = True
@@ -50,7 +50,7 @@ def make_routes_per_sat(x_values, sat):
             node_list_map = [nmap[sat], nmap[i]]
             i_route = i
             c = 0
-            while i_route < len(x_values[:,0]) and sat not in node_list[1:]: 
+            while i_route < len(x_values[:,0]) and all(sat not in node_list[1:] for sat in satellites) and c < 100: 
                 for j in range(len(x_values[0,:])):
                     if x_values[j, i_route] == 1:
                         flag = False
@@ -74,14 +74,14 @@ def make_routes_per_sat(x_values, sat):
 def make_node_routes(x_values, satellites):
     node_routes = []
     for sat in satellites:
-        routes = make_routes_per_sat(x_values, sat)
+        routes = make_routes_per_sat(x_values, sat, satellites)
         for route in routes:
             node_routes.append(route)
         
     return node_routes
     
 
-# node_routes = make_node_routes(x_values, (0,15))
+node_routes = make_node_routes(x_values, (0,15))
 
 
 def make_coordinate_routes(node_routes, coordinates):
@@ -91,9 +91,6 @@ def make_coordinate_routes(node_routes, coordinates):
         route = []
         for i in node_list:
             route.append(coordinates[i])
-        
-        # Make route circular by adding back first element to end of list.
-        route.append(route[0])
         
         routes.append(route)
         
