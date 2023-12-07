@@ -10,14 +10,13 @@ import numpy as np
 import gurobipy as gp
 from gurobipy import GRB
 
-# import plots as pl
 from plots import nmap
 
 # ---- Global variables ----
 n = 14  # Number of customers
 n_bar = 22  # Total nodes
-m = 10  # Number of bikes available
-Q = 80  # Bike capacity
+m = 2  # Number of bikes available
+Q = 60  # Bike capacity
 Q_hat = 40  # Max inventory on bike before refill permitted
 T = 120  # Max time per route
 
@@ -60,19 +59,28 @@ for i in range(len(tau)-1): # Subtract 1 since last row of tau is (real) depot
     T_list = []
     for j in range(len(tau)-1):
         if i in Satellites:
-            temp_list = [p[i] + tau[i,k] + p[k] + min(tau[k, Satellites[0]], tau[k, Satellites[1]]) for k in range(len(p))]
-            T_list.append(T-min(tau[Satellites[0],j], tau[Satellites[1],j]) - min(temp_list))
+            temp_list = [p[i] + tau[i,k] + p[k] \
+                         + min(tau[k, Satellites[0]], tau[k, Satellites[1]]) 
+                         for k in range(len(p))]
+            T_list.append(T-min(tau[Satellites[0],j], tau[Satellites[1],j]) \
+                          - min(temp_list))
         else:
-            T_list.append(T - min(tau[Satellites[0],j], tau[Satellites[1],j]) - (p[i] + min(tau[i, Satellites[0]], tau[i, Satellites[1]])))
+            T_list.append(T - min(tau[Satellites[0],j], tau[Satellites[1],j]) \
+                          - (p[i] + min(tau[i, Satellites[0]], 
+                                        tau[i, Satellites[1]])))
             
     T_array.append(T_list)
     
 # Lower bound for t[0]
-t_lb = max([2*min(tau[Satellites[0],i], tau[Satellites[1],i]) + p[i] for i in range(len(p)) if i not in Satellites])  
+t_lb = max([2*min(tau[Satellites[0],i], tau[Satellites[1],i]) + p[i] 
+            for i in range(len(p)) if i not in Satellites])  
 
-tj_min = [min([min(tau[Satellites[0],i], tau[Satellites[1],i]) + p[i] + tau[i,j] for i in range(len(p))]) for j in range(len(p))]
+tj_min = [min([min(tau[Satellites[0],i], tau[Satellites[1],i]) + p[i] + tau[i,j] 
+               for i in range(len(p))]) for j in range(len(p))]
 
-tj_max = [max([T - p[j] - tau[j,i] - p[i] - min(tau[i, Satellites[0]], tau[i, Satellites[1]]) for i in range(len(p))]) for j in range(len(p))]
+tj_max = [max([T - p[j] - tau[j,i] - p[i] \
+               - min(tau[i, Satellites[0]], tau[i, Satellites[1]]) 
+               for i in range(len(p))]) for j in range(1,len(p))]
 
 # Below here we use node indexes, no nmap is needed when referring to
 # x, t, y
@@ -104,8 +112,11 @@ y = model.addVars(n_bar, vtype=GRB.CONTINUOUS, lb=0, ub=Q, name = 'y')
 # Ensure each customer has exactly 1 successor
 model.addConstrs(gp.quicksum(x[i,j] for j in N if i !=j) == 1 for i in I)
 
-# Each (copy of a) satellite has at most one successor
+# Each copy of a satellite has at most one successor
 model.addConstrs(gp.quicksum(x[i,j] for j in I if i !=j) <= 1 for i in N_a)
+
+# Each satellite has at most one successor
+model.addConstrs(gp.quicksum(x[i,j] for j in I if i !=j) <= 1 for i in S)
 
 # Number of arrivals at a node equal number of departures
 model.addConstrs(gp.quicksum(x[j,i] for i in N if i != j) 
@@ -113,7 +124,7 @@ model.addConstrs(gp.quicksum(x[j,i] for i in N if i != j)
                  == 0 for j in N)
 
 # No more than m vehicles used (i.e. only m vehicles can start journey at a depot)
-model.addConstr(gp.quicksum(x[0,j]+x[15,j] for j in I) <= m)
+model.addConstr(gp.quicksum(x[i,j] for i in S for j in I) <= m)
 # model.addConstr(gp.quicksum(x[j,0]+x[j,15] for j in I) <= m)
 
 # Tracks the time a service begins at node j. Also functions to eliminate subtours
@@ -127,11 +138,16 @@ model.addConstrs(t[s] >= t_lb for s in S)
 
 # Lower bound for t at customer nodes. There must be enough time to get to the
 # customer from the depot.
-model.addConstrs(t[j] >= min(tau[Satellites[0], nmap[j]], tau[Satellites[1], nmap[j]]) for j in I)
+model.addConstrs(t[j] >= min(tau[Satellites[0], nmap[j]], 
+                             tau[Satellites[1], nmap[j]]) 
+                 for j in I)
 
 # Upper bound for t at customer nodes. There must be enough time left for the
 # bike to get back to the depot
-model.addConstrs(t[j] <= T - (p[nmap[j]] + min(tau[nmap[j], Satellites[0]], tau[nmap[j], Satellites[1]])) for j in I)
+model.addConstrs(t[j] <= T - (p[nmap[j]] \
+                              + min(tau[nmap[j], Satellites[0]], 
+                                    tau[nmap[j], Satellites[1]])) 
+                 for j in I)
 
 # Minimum amount of time to go from depot to customer, provide service, and go
 # to a satellite.
@@ -142,7 +158,8 @@ model.addConstrs(t[j] >= tj_min[nmap[j]] for j in N_a)
 model.addConstrs(t[j] <= tj_max[nmap[j]] for j in N_a)
 
 # Tracks the load on a bike just prior to visiting node j
-model.addConstrs(y[j] <= y[i] - q_bar[nmap[i]]*x[i,j] + Q_bar[nmap[i]]*(1-x[i,j])
+model.addConstrs(y[j] <= y[i] - q_bar[nmap[i]]*x[i,j] \
+                 + Q_bar[nmap[i]]*(1-x[i,j])
                  for i in I_F for j in N if i != j)
 
 # Load must be high enough to service the customer

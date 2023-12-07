@@ -149,6 +149,6 @@ times = []
 for route in customer_routes:
     time = 0
     for stop in range(len(route)-1):
-        time += tau[route[stop], route[stop+1]]
+        time += tau[route[stop], route[stop+1]]+5
     times.append(time)
     
